@@ -52,16 +52,16 @@ describe("ChatHistory", () => {
   });
 });
 
-describe("ChatHistory.recordTranslation", () => {
-  it("stores the translation on the message with that id", async () => {
+describe("ChatHistory.recordReply", () => {
+  it("stores the reply on the message with that id", async () => {
     const history = createChatHistory();
     await history.addMessage({ id: "m1", text: "こんにちは" });
     await history.addMessage({ id: "m2", text: "元気？" });
 
-    await history.recordTranslation("m1", "Hello");
+    await history.recordReply("m1", "Hello");
 
     assert.deepEqual(await history.getHistory(), [
-      { id: "m1", text: "こんにちは", translation: "Hello" },
+      { id: "m1", text: "こんにちは", reply: "Hello" },
       { id: "m2", text: "元気？" }
     ]);
   });
@@ -71,7 +71,7 @@ describe("ChatHistory.recordTranslation", () => {
     await history.addMessage({ id: "m1", text: "old" });
     await history.addMessage({ id: "m2", text: "new" });
 
-    await history.recordTranslation("m1", "T");
+    await history.recordReply("m1", "T");
 
     assert.deepEqual(await history.getHistory(), [{ id: "m2", text: "new" }]);
   });
@@ -83,11 +83,11 @@ describe("historyLength", () => {
     assert.equal(historyLength({ HISTORY_LENGTH: 8 }), 8);
   });
 
-  it("falls back to 5 when HISTORY_LENGTH is missing or invalid", () => {
+  it("falls back to 100 when HISTORY_LENGTH is missing or invalid", () => {
     for (const value of [undefined, "", "abc", "0", "-2", "2.5"]) {
       assert.equal(
         historyLength({ HISTORY_LENGTH: value }),
-        5,
+        100,
         `HISTORY_LENGTH=${value}`
       );
     }

@@ -1,9 +1,10 @@
 import { DurableObject } from "cloudflare:workers";
 
-const DEFAULT_HISTORY_LENGTH = 5;
+// Also sets how long instructions in service messages stay in effect.
+const DEFAULT_HISTORY_LENGTH = 100;
 
-// Entries are {id, sender, text, translation?}, where translation is the
-// reply LINE accepted for that message.
+// Entries are {id, sender, text, isService?, reply?}, where reply is the
+// bot's reply to that message that LINE accepted.
 export class ChatHistory extends DurableObject {
   // Resolves to null when LINE redelivers a message that is already stored.
   async addMessage(message) {
@@ -20,12 +21,12 @@ export class ChatHistory extends DurableObject {
   }
 
   // The message may have left the history already; then nothing is recorded.
-  async recordTranslation(messageId, translation) {
+  async recordReply(messageId, reply) {
     const history = await this.getHistory();
     const message = history.find(({ id }) => id === messageId);
 
     if (message) {
-      message.translation = translation;
+      message.reply = reply;
       await this.ctx.storage.put("history", history);
     }
   }

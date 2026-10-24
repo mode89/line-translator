@@ -22,6 +22,11 @@ export function stubFetch(t, respond) {
   return calls;
 }
 
+// An OpenRouter chat completion whose answer is `content`.
+export function modelAnswer(content) {
+  return Response.json({ choices: [{ message: { content } }] });
+}
+
 export function silenceConsoleError(t) {
   return t.mock.method(console, "error", () => {});
 }
