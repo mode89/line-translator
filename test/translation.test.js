@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  formatTranslationRequest,
   parseModelSetting,
+  toPromptMessages,
   translateLatestMessage
 } from "../src/translation.js";
 import { silenceConsoleError, stubFetch } from "./support/fakes.js";
 
 const CONVERSATION = [
-  { sender: "Alice", text: "こんにちは" },
+  { sender: "Alice", text: "こんにちは", translation: "Hello" },
   { sender: "Bob", text: "Hi Alice" },
   { sender: "Alice", text: "元気？\n二行目" }
 ];
@@ -50,33 +50,21 @@ describe("parseModelSetting", () => {
   });
 });
 
-describe("formatTranslationRequest", () => {
-  it("lists earlier messages as history and names the new sender", () => {
-    assert.equal(
-      formatTranslationRequest(CONVERSATION),
-      [
-        "History:",
-        "",
-        "```",
-        "Alice: こんにちは",
-        "---",
-        "Bob: Hi Alice",
-        "```",
-        "",
-        "Translate the following message of Alice:",
-        "",
-        "元気？",
-        "二行目"
-      ].join("\n")
-    );
+describe("toPromptMessages", () => {
+  it("follows each earlier message with the bot's answer", () => {
+    assert.deepEqual(toPromptMessages(CONVERSATION), [
+      { role: "user", content: "Alice: こんにちは" },
+      { role: "assistant", content: "Hello" },
+      { role: "user", content: "Bob: Hi Alice" },
+      { role: "assistant", content: "NO_RESPONSE" },
+      { role: "user", content: "Alice: 元気？\n二行目" }
+    ]);
   });
 
-  it("leaves the history empty for the first message", () => {
-    assert.equal(
-      formatTranslationRequest([{ sender: "Alice", text: "hi" }]),
-      "History:\n\n```\n\n```\n\n" +
-        "Translate the following message of Alice:\n\nhi"
-    );
+  it("sends only the new message when there is no history", () => {
+    assert.deepEqual(toPromptMessages([{ sender: "Alice", text: "hi" }]), [
+      { role: "user", content: "Alice: hi" }
+    ]);
   });
 });
 
@@ -93,10 +81,7 @@ describe("translateLatestMessage", () => {
     assert.equal(body.model, "openai/gpt-5-mini");
     assert.deepEqual(body.reasoning, { effort: "low" });
     assert.equal(body.messages[0].role, "system");
-    assert.deepEqual(body.messages[1], {
-      role: "user",
-      content: formatTranslationRequest(CONVERSATION)
-    });
+    assert.deepEqual(body.messages.slice(1), toPromptMessages(CONVERSATION));
   });
 
   it("returns the trimmed translation", async t => {
@@ -107,7 +92,7 @@ describe("translateLatestMessage", () => {
   });
 
   it("returns null when the model finds nothing to translate into", async t => {
-    stubFetch(t, () => answer("NO_TRANSLATION"));
+    stubFetch(t, () => answer("NO_RESPONSE"));
 
     assert.equal(await translateLatestMessage(CONVERSATION, SETTINGS), null);
   });

@@ -68,6 +68,7 @@ export async function fetchGroupMemberName(accessToken, groupId, userId) {
   }
 }
 
+// Resolves to whether LINE accepted the reply.
 export async function replyToLine(accessToken, replyToken, text, quoteToken) {
   try {
     const response = await fetch(
@@ -92,8 +93,11 @@ export async function replyToLine(accessToken, replyToken, text, quoteToken) {
         await response.text()
       );
     }
+
+    return response.ok;
   } catch (error) {
     console.error("LINE reply failed:", error);
+    return false;
   }
 }
 

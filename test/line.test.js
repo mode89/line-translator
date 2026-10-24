@@ -122,8 +122,14 @@ describe("replyToLine", () => {
   it("replies with the text, quoting the original message", async t => {
     const calls = stubFetch(t, () => new Response(""));
 
-    await replyToLine("token", "reply-token", "Hello", "quote-token");
+    const isReplied = await replyToLine(
+      "token",
+      "reply-token",
+      "Hello",
+      "quote-token"
+    );
 
+    assert.equal(isReplied, true);
     assert.equal(calls[0].url, "https://api.line.me/v2/bot/message/reply");
     assert.equal(calls[0].init.headers.Authorization, "Bearer token");
     assert.deepEqual(JSON.parse(calls[0].init.body), {
@@ -132,23 +138,21 @@ describe("replyToLine", () => {
     });
   });
 
-  it("logs instead of throwing when LINE answers with an error", async t => {
+  it("reports failure and logs when LINE answers with an error", async t => {
     stubFetch(t, () => new Response("invalid reply token", { status: 400 }));
     const logged = silenceConsoleError(t);
 
-    await replyToLine("token", "reply-token", "Hello");
-
+    assert.equal(await replyToLine("token", "reply-token", "Hello"), false);
     assert.equal(logged.mock.callCount(), 1);
   });
 
-  it("logs instead of throwing when the request fails", async t => {
+  it("reports failure and logs when the request fails", async t => {
     stubFetch(t, () => {
       throw new Error("network down");
     });
     const logged = silenceConsoleError(t);
 
-    await replyToLine("token", "reply-token", "Hello");
-
+    assert.equal(await replyToLine("token", "reply-token", "Hello"), false);
     assert.equal(logged.mock.callCount(), 1);
   });
 });

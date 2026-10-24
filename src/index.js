@@ -73,11 +73,16 @@ async function replyWithTranslation(env, event) {
     userId
   );
 
-  const history = env.CHAT_HISTORY.getByName(groupId);
-  const conversation = await history.addMessage({
+  const chatHistory = env.CHAT_HISTORY.getByName(groupId);
+  const conversation = await chatHistory.addMessage({
+    id: event.message.id,
     sender,
     text: event.message.text
   });
+
+  if (!conversation) {
+    return;
+  }
 
   const translation = await translateLatestMessage(conversation, {
     apiKey: env.OPENROUTER_API_KEY,
@@ -88,10 +93,15 @@ async function replyWithTranslation(env, event) {
     return;
   }
 
-  await replyToLine(
+  const isAccepted = await replyToLine(
     env.LINE_CHANNEL_ACCESS_TOKEN,
     event.replyToken,
     translation,
     event.message.quoteToken
   );
+
+  // Only translations the group has seen become context for later ones.
+  if (isAccepted) {
+    await chatHistory.recordTranslation(event.message.id, translation);
+  }
 }

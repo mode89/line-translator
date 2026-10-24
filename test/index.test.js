@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { describe, it } from "node:test";
 import worker, { ChatHistory } from "../src/index.js";
-import { createStorage, stubFetch } from "./support/fakes.js";
+import {
+  createStorage,
+  silenceConsoleError,
+  stubFetch
+} from "./support/fakes.js";
 
 const SECRET = "channel-secret";
 const NAMES = { U1: "Alice", U2: "Bob" };
@@ -45,16 +49,56 @@ describe("webhook", () => {
     ]);
   });
 
-  it("sends earlier group messages and their senders as context", async t => {
+  it("sends earlier messages and translations as context", async t => {
     const env = createEnv();
     const { translationRequests } = fakeServices(t, { translation: "T" });
 
     await sendMessages(env, [groupMessage("こんにちは", "U1")]);
     await sendMessages(env, [groupMessage("Hi Alice", "U2")]);
 
-    const request = translationRequests.at(-1);
-    assert.match(request, /```\nAlice: こんにちは\n```/);
-    assert.match(request, /following message of Bob:\n\nHi Alice$/);
+    assert.deepEqual(translationRequests.at(-1), [
+      { role: "user", content: "Alice: こんにちは" },
+      { role: "assistant", content: "T" },
+      { role: "user", content: "Bob: Hi Alice" }
+    ]);
+  });
+
+  it("keeps rejected replies out of later context", async t => {
+    const env = createEnv();
+    const { translationRequests } = fakeServices(t, {
+      translation: "T",
+      replyStatus: 400
+    });
+    silenceConsoleError(t);
+
+    await sendMessages(env, [groupMessage("こんにちは", "U1")]);
+    await sendMessages(env, [groupMessage("Hi Alice", "U2")]);
+
+    assert.deepEqual(translationRequests.at(-1), [
+      { role: "user", content: "Alice: こんにちは" },
+      { role: "assistant", content: "NO_RESPONSE" },
+      { role: "user", content: "Bob: Hi Alice" }
+    ]);
+  });
+
+  it("stores no translation when the model declines", async t => {
+    const env = createEnv();
+    fakeServices(t, { translation: "NO_RESPONSE" });
+
+    await sendMessages(env, [groupMessage("hi", "U1")]);
+
+    const stored = await env.CHAT_HISTORY.getByName("G1").getHistory();
+    assert.deepEqual(stored, [{ id: "id-hi", sender: "Alice", text: "hi" }]);
+  });
+
+  it("ignores a message LINE redelivers", async t => {
+    const env = createEnv();
+    const { replies } = fakeServices(t, { translation: "T" });
+
+    await sendMessages(env, [groupMessage("hi", "U1")]);
+    await sendMessages(env, [groupMessage("hi", "U1")]);
+
+    assert.equal(replies.length, 1);
   });
 
   it("keeps a separate history per group", async t => {
@@ -64,11 +108,13 @@ describe("webhook", () => {
     await sendMessages(env, [groupMessage("in G1", "U1", "G1")]);
     await sendMessages(env, [groupMessage("in G2", "U2", "G2")]);
 
-    assert.doesNotMatch(translationRequests.at(-1), /in G1/);
+    assert.deepEqual(translationRequests.at(-1), [
+      { role: "user", content: "Bob: in G2" }
+    ]);
   });
 
   it("stays silent when there is nothing to translate into", async t => {
-    const { replies } = fakeServices(t, { translation: "NO_TRANSLATION" });
+    const { replies } = fakeServices(t, { translation: "NO_RESPONSE" });
 
     await sendMessages(createEnv(), [groupMessage("hi", "U1")]);
 
@@ -124,7 +170,7 @@ function createChatHistoryNamespace(env) {
   };
 }
 
-function fakeServices(t, { translation }) {
+function fakeServices(t, { translation, replyStatus = 200 }) {
   const replies = [];
   const translationRequests = [];
 
@@ -136,14 +182,14 @@ function fakeServices(t, { translation }) {
     }
 
     if (url.startsWith("https://openrouter.ai/")) {
-      translationRequests.push(JSON.parse(init.body).messages[1].content);
+      translationRequests.push(JSON.parse(init.body).messages.slice(1));
       return Response.json({
         choices: [{ message: { content: translation } }]
       });
     }
 
     replies.push(JSON.parse(init.body));
-    return new Response("");
+    return new Response("", { status: replyStatus });
   });
 
   return { replies, translationRequests };
@@ -153,7 +199,12 @@ function groupMessage(text, userId, groupId = "G1") {
   return {
     type: "message",
     replyToken: `reply-${text}`,
-    message: { type: "text", text, quoteToken: `quote-${text}` },
+    message: {
+      type: "text",
+      id: `id-${text}`,
+      text,
+      quoteToken: `quote-${text}`
+    },
     source: { type: "group", groupId, userId }
   };
 }

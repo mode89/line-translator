@@ -1,16 +1,15 @@
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const NO_TRANSLATION = "NO_TRANSLATION";
-const HISTORY_SEPARATOR = "\n---\n";
+const NO_RESPONSE = "NO_RESPONSE";
 const REASONING_EFFORTS = ["xhigh", "high", "medium", "low", "minimal", "none"];
 
 /* eslint-disable @stylistic/max-len -- prompt line breaks are sent as is */
 const INSTRUCTIONS = `You translate messages in a group chat.
-You get the recent chat history, oldest first, as "sender: text" entries separated by "---", followed by a new message to translate.
+Each user message is a group message as "sender: text", oldest first. Each of your answers is what you replied to the message before it: a translation, or ${NO_RESPONSE} when you did not reply. The last user message is the new message to translate.
 
 1. Determine the language of the new message.
-2. Each participant prefers the language they write in. Find the most recent history message from another participant (not the sender of the new message) written in a different language. Its language is the target language.
-3. If there is no such message, answer exactly ${NO_TRANSLATION}.
-4. Otherwise translate the new message into the target language. Translate it however short it is. Use the history only as context.
+2. Each participant prefers the language they write in. Find the most recent user message from another participant (not the sender of the new message) written in a different language. Its language is the target language. Your own answers never count here.
+3. If there is no such message, answer exactly ${NO_RESPONSE}.
+4. Otherwise translate the new message into the target language. Translate it however short it is. Use the earlier messages only as context, and keep wording consistent with your earlier translations.
 
 Answer with the translated text alone.`;
 /* eslint-enable @stylistic/max-len */
@@ -32,7 +31,7 @@ export async function translateLatestMessage(
         ...parseModelSetting(modelSetting),
         messages: [
           { role: "system", content: INSTRUCTIONS },
-          { role: "user", content: formatTranslationRequest(conversation) }
+          ...toPromptMessages(conversation)
         ]
       })
     });
@@ -49,7 +48,7 @@ export async function translateLatestMessage(
     const { choices } = await response.json();
     const answer = choices?.[0]?.message?.content?.trim();
 
-    return !answer || answer === NO_TRANSLATION ? null : answer;
+    return !answer || answer === NO_RESPONSE ? null : answer;
   } catch (error) {
     console.error("OpenRouter translation failed:", error);
     return null;
@@ -69,23 +68,24 @@ export function parseModelSetting(setting) {
   return { model: setting };
 }
 
-export function formatTranslationRequest(conversation) {
-  const history = conversation.slice(0, -1);
-  const { sender, text } = conversation.at(-1);
+// Turns alternate user/assistant; the new message is last, unanswered.
+export function toPromptMessages(conversation) {
+  const earlierMessages = conversation.slice(0, -1);
+  const newMessage = conversation.at(-1);
 
   return [
-    "History:",
-    "",
-    "```",
-    history.map(formatHistoryEntry).join(HISTORY_SEPARATOR),
-    "```",
-    "",
-    `Translate the following message of ${sender}:`,
-    "",
-    text
-  ].join("\n");
+    ...earlierMessages.flatMap(message => [
+      toUserMessage(message),
+      toAssistantMessage(message)
+    ]),
+    toUserMessage(newMessage)
+  ];
 }
 
-function formatHistoryEntry({ sender, text }) {
-  return `${sender}: ${text}`;
+function toUserMessage({ sender, text }) {
+  return { role: "user", content: `${sender}: ${text}` };
+}
+
+function toAssistantMessage({ translation }) {
+  return { role: "assistant", content: translation ?? NO_RESPONSE };
 }
