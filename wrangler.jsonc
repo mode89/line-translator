@@ -1,5 +1,19 @@
 {
   "name": "lt",
   "main": "src/index.js",
-  "compatibility_date": "2026-10-19"
+  "compatibility_date": "2026-10-19",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CHAT_HISTORY",
+        "class_name": "ChatHistory"
+      }
+    ]
+  },
+  "exports": {
+    "ChatHistory": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  }
 }

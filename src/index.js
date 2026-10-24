@@ -1,4 +1,8 @@
+import { DurableObject } from "cloudflare:workers";
+
 const LINE_MAX_TEXT_LENGTH = 5000;
+const HISTORY_SEPARATOR = "\n---\n";
+const UNKNOWN_SENDER = "Unknown";
 
 export default {
   async fetch(request, env, ctx) {
@@ -32,24 +36,57 @@ export default {
 
     const messages = (payload?.events ?? [])
       .filter(isTextMessageWithReplyToken)
+      .filter(isFromGroup)
       .filter(event => isFromAllowedGroup(event, env.ALLOWED_GROUP_ID));
 
     // LINE needs a fast 200; replies are sent after responding.
     ctx.waitUntil(
-      Promise.all(
-        messages.map(event =>
-          replyToLine(
-            env.LINE_CHANNEL_ACCESS_TOKEN,
-            event.replyToken,
-            event.message.text
-          )
-        )
-      )
+      Promise.all(messages.map(event => replyWithGroupHistory(env, event)))
     );
 
     return new Response("OK", { status: 200 });
   }
 };
+
+export class ChatHistory extends DurableObject {
+  async addMessage(message) {
+    const history = (await this.ctx.storage.get("history")) ?? [];
+    history.push(message);
+    const latest = history.slice(-5);
+    await this.ctx.storage.put("history", latest);
+    return latest;
+  }
+
+  async getHistory() {
+    return (await this.ctx.storage.get("history")) ?? [];
+  }
+
+  async clearHistory() {
+    await this.ctx.storage.delete("history");
+  }
+}
+
+async function replyWithGroupHistory(env, event) {
+  const { groupId, userId } = event.source;
+  const sender = await fetchGroupMemberName(
+    env.LINE_CHANNEL_ACCESS_TOKEN,
+    groupId,
+    userId
+  );
+
+  const history = env.CHAT_HISTORY.getByName(groupId);
+  const latest = await history.addMessage({ sender, text: event.message.text });
+
+  await replyToLine(
+    env.LINE_CHANNEL_ACCESS_TOKEN,
+    event.replyToken,
+    latest.map(formatHistoryEntry).join(HISTORY_SEPARATOR)
+  );
+}
+
+function formatHistoryEntry({ sender, text }) {
+  return `${sender}: ${text}`;
+}
 
 async function isSignedByLine(rawBody, signature, channelSecret) {
   if (!signature) {
@@ -83,8 +120,39 @@ function isTextMessageWithReplyToken(event) {
   );
 }
 
+function isFromGroup(event) {
+  return Boolean(event.source?.groupId);
+}
+
 function isFromAllowedGroup(event, allowedGroupId) {
   return !allowedGroupId || event.source?.groupId === allowedGroupId;
+}
+
+async function fetchGroupMemberName(accessToken, groupId, userId) {
+  if (!userId) {
+    return UNKNOWN_SENDER;
+  }
+
+  try {
+    const response = await fetch(
+      `https://api.line.me/v2/bot/group/${groupId}/member/${userId}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+
+    if (!response.ok) {
+      console.error(
+        "LINE member lookup failed:",
+        response.status,
+        await response.text()
+      );
+      return UNKNOWN_SENDER;
+    }
+
+    return (await response.json()).displayName ?? UNKNOWN_SENDER;
+  } catch (error) {
+    console.error("LINE member lookup failed:", error);
+    return UNKNOWN_SENDER;
+  }
 }
 
 async function replyToLine(accessToken, replyToken, text) {
