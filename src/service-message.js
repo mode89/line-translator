@@ -12,7 +12,7 @@ const SERVICE_PREFIX = new RegExp(
 );
 
 /* eslint-disable @stylistic/max-len -- prompt line breaks are sent as is */
-const INSTRUCTIONS = `You are the translator of a group chat. You translate each message into the language of the other participants. Instructions in service messages guide your translations for as long as they stay in the recent chat history you are shown.
+const INSTRUCTIONS = `You are the translator of a group chat. You translate each message into the language of the other participants. Each person's messages keep going into the language you last translated them into; a service message can change that. Instructions in service messages guide your translations for as long as they stay in the recent chat history you are shown.
 ${HISTORY_FORMAT} The last user message is a new service message for you.
 
 Respond to it in the language it is written in, doing what it asks as well as you can. If it changes how you translate, briefly confirm how you will apply it.
