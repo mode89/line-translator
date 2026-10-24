@@ -2,6 +2,9 @@
   "name": "lt",
   "main": "src/index.js",
   "compatibility_date": "2026-10-19",
+  "vars": {
+    "OPENROUTER_MODEL": ""
+  },
   "durable_objects": {
     "bindings": [
       {
