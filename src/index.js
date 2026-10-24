@@ -2,10 +2,12 @@
 // - LINE_CHANNEL_SECRET (secret): verifies that webhook calls come from LINE.
 // - LINE_CHANNEL_ACCESS_TOKEN (secret): authorizes calls to the LINE API.
 // - OPENROUTER_API_KEY (secret): authorizes calls to OpenRouter.
-// - OPENROUTER_MODEL (var in wrangler.jsonc): OpenRouter model id used for translation, optionally
-//   followed by ":<effort>" to set the reasoning effort, e.g. "openai/gpt-5-mini:low".
+// - OPENROUTER_MODEL (var in wrangler.jsonc): OpenRouter model id used for
+//   translation, optionally followed by ":<effort>" to set the reasoning
+//   effort, e.g. "openai/gpt-5-mini:low".
 // - ALLOWED_GROUP_ID (optional): when set, only this LINE group is served.
-// - HISTORY_LENGTH (optional, default 5): messages kept per group, including the new one, as translation context.
+// - HISTORY_LENGTH (optional, default 5): messages kept per group, including
+//   the new one, as translation context.
 
 import {
   fetchGroupMemberName,

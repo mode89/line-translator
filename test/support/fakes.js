@@ -9,7 +9,8 @@ export function createStorage() {
   };
 }
 
-// Replaces global fetch for one test; `respond` gets (url, init) and returns a Response or throws.
+// Replaces global fetch for one test; `respond` gets (url, init) and returns
+// a Response or throws.
 export function stubFetch(t, respond) {
   const calls = [];
 

@@ -22,5 +22,6 @@ export class ChatHistory extends DurableObject {
 
 export function historyLength(env) {
   const length = Number(env.HISTORY_LENGTH);
-  return Number.isInteger(length) && length > 0 ? length : DEFAULT_HISTORY_LENGTH;
+  const isValid = Number.isInteger(length) && length > 0;
+  return isValid ? length : DEFAULT_HISTORY_LENGTH;
 }

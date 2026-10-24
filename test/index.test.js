@@ -9,7 +9,8 @@ const NAMES = { U1: "Alice", U2: "Bob" };
 
 describe("webhook", () => {
   it("answers 404 outside /webhook", async () => {
-    const response = await send(createEnv(), JSON.stringify({ events: [] }), { path: "/other" });
+    const body = JSON.stringify({ events: [] });
+    const response = await send(createEnv(), body, { path: "/other" });
     assert.equal(response.status, 404);
   });
 
@@ -44,15 +45,16 @@ describe("webhook", () => {
     ]);
   });
 
-  it("sends the group's earlier messages and their senders as context", async t => {
+  it("sends earlier group messages and their senders as context", async t => {
     const env = createEnv();
     const { translationRequests } = fakeServices(t, { translation: "T" });
 
     await sendMessages(env, [groupMessage("こんにちは", "U1")]);
     await sendMessages(env, [groupMessage("Hi Alice", "U2")]);
 
-    assert.match(translationRequests.at(-1), /```\nAlice: こんにちは\n```/);
-    assert.match(translationRequests.at(-1), /Translate the following message of Bob:\n\nHi Alice$/);
+    const request = translationRequests.at(-1);
+    assert.match(request, /```\nAlice: こんにちは\n```/);
+    assert.match(request, /following message of Bob:\n\nHi Alice$/);
   });
 
   it("keeps a separate history per group", async t => {
@@ -75,11 +77,19 @@ describe("webhook", () => {
 
   it("ignores messages from 1:1 chats, rooms and other groups", async t => {
     const env = createEnv({ ALLOWED_GROUP_ID: "G1" });
-    const { replies, translationRequests } = fakeServices(t, { translation: "T" });
+    const { replies, translationRequests } = fakeServices(t, {
+      translation: "T"
+    });
 
     await sendMessages(env, [
-      { ...groupMessage("1:1", "U1"), source: { type: "user", userId: "U1" } },
-      { ...groupMessage("room", "U1"), source: { type: "room", roomId: "R1", userId: "U1" } },
+      {
+        ...groupMessage("1:1", "U1"),
+        source: { type: "user", userId: "U1" }
+      },
+      {
+        ...groupMessage("room", "U1"),
+        source: { type: "room", roomId: "R1", userId: "U1" }
+      },
       groupMessage("other group", "U1", "G2")
     ]);
 
@@ -127,7 +137,9 @@ function fakeServices(t, { translation }) {
 
     if (url.startsWith("https://openrouter.ai/")) {
       translationRequests.push(JSON.parse(init.body).messages[1].content);
-      return Response.json({ choices: [{ message: { content: translation } }] });
+      return Response.json({
+        choices: [{ message: { content: translation } }]
+      });
     }
 
     replies.push(JSON.parse(init.body));
@@ -150,8 +162,13 @@ function sendMessages(env, events) {
   return send(env, JSON.stringify({ events }));
 }
 
-// Runs the handler and waits for the work it hands to ctx.waitUntil, like the Workers runtime would.
-async function send(env, body, { path = "/webhook", method = "POST", signature } = {}) {
+// Runs the handler and waits for the work it hands to ctx.waitUntil, like the
+// Workers runtime would.
+async function send(
+  env,
+  body,
+  { path = "/webhook", method = "POST", signature } = {}
+) {
   const headers = {};
 
   if (body !== undefined) {

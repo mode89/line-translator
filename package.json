@@ -1,9 +1,12 @@
 {
   "type": "module",
   "scripts": {
-    "test": "node --import ./test/support/register-hooks.js --test"
+    "test": "node --import ./test/support/register-hooks.js --test",
+    "lint": "eslint"
   },
   "devDependencies": {
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "eslint": "^10.13.0",
     "wrangler": "^4.152.0"
   }
 }

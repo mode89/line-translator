@@ -15,11 +15,14 @@ const CONVERSATION = [
 
 const SETTINGS = { apiKey: "key", modelSetting: "openai/gpt-5-mini:low" };
 
-const answer = content => Response.json({ choices: [{ message: { content } }] });
+const answer = content =>
+  Response.json({ choices: [{ message: { content } }] });
 
 describe("parseModelSetting", () => {
   it("uses a plain model id as is", () => {
-    assert.deepEqual(parseModelSetting("openai/gpt-5-mini"), { model: "openai/gpt-5-mini" });
+    assert.deepEqual(parseModelSetting("openai/gpt-5-mini"), {
+      model: "openai/gpt-5-mini"
+    });
   });
 
   it("splits off a reasoning effort suffix", () => {
@@ -48,7 +51,7 @@ describe("parseModelSetting", () => {
 });
 
 describe("formatTranslationRequest", () => {
-  it("lists earlier messages as history and names the sender of the new one", () => {
+  it("lists earlier messages as history and names the new sender", () => {
     assert.equal(
       formatTranslationRequest(CONVERSATION),
       [
@@ -71,13 +74,14 @@ describe("formatTranslationRequest", () => {
   it("leaves the history empty for the first message", () => {
     assert.equal(
       formatTranslationRequest([{ sender: "Alice", text: "hi" }]),
-      "History:\n\n```\n\n```\n\nTranslate the following message of Alice:\n\nhi"
+      "History:\n\n```\n\n```\n\n" +
+        "Translate the following message of Alice:\n\nhi"
     );
   });
 });
 
 describe("translateLatestMessage", () => {
-  it("asks OpenRouter with the configured model, effort and conversation", async t => {
+  it("asks OpenRouter with the model, effort and conversation", async t => {
     const calls = stubFetch(t, () => answer("Hello"));
 
     await translateLatestMessage(CONVERSATION, SETTINGS);
@@ -98,7 +102,8 @@ describe("translateLatestMessage", () => {
   it("returns the trimmed translation", async t => {
     stubFetch(t, () => answer("  How are you?\n"));
 
-    assert.equal(await translateLatestMessage(CONVERSATION, SETTINGS), "How are you?");
+    const translation = await translateLatestMessage(CONVERSATION, SETTINGS);
+    assert.equal(translation, "How are you?");
   });
 
   it("returns null when the model finds nothing to translate into", async t => {

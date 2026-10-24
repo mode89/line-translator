@@ -3,10 +3,11 @@ import { describe, it } from "node:test";
 import { ChatHistory, historyLength } from "../src/chat-history.js";
 import { createStorage } from "./support/fakes.js";
 
-const createChatHistory = (env = {}) => new ChatHistory({ storage: createStorage() }, env);
+const createChatHistory = (env = {}) =>
+  new ChatHistory({ storage: createStorage() }, env);
 
 describe("ChatHistory", () => {
-  it("returns the stored messages, oldest first, including the new one", async () => {
+  it("returns stored messages, oldest first, with the new one", async () => {
     const history = createChatHistory();
 
     await history.addMessage("first");
@@ -43,7 +44,11 @@ describe("historyLength", () => {
 
   it("falls back to 5 when HISTORY_LENGTH is missing or invalid", () => {
     for (const value of [undefined, "", "abc", "0", "-2", "2.5"]) {
-      assert.equal(historyLength({ HISTORY_LENGTH: value }), 5, `HISTORY_LENGTH=${value}`);
+      assert.equal(
+        historyLength({ HISTORY_LENGTH: value }),
+        5,
+        `HISTORY_LENGTH=${value}`
+      );
     }
   });
 });

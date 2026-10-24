@@ -3,6 +3,7 @@ const NO_TRANSLATION = "NO_TRANSLATION";
 const HISTORY_SEPARATOR = "\n---\n";
 const REASONING_EFFORTS = ["xhigh", "high", "medium", "low", "minimal", "none"];
 
+/* eslint-disable @stylistic/max-len -- prompt line breaks are sent as is */
 const INSTRUCTIONS = `You translate messages in a group chat.
 You get the recent chat history, oldest first, as "sender: text" entries separated by "---", followed by a new message to translate.
 
@@ -12,9 +13,14 @@ You get the recent chat history, oldest first, as "sender: text" entries separat
 4. Otherwise translate the new message into the target language. Translate it however short it is. Use the history only as context.
 
 Answer with the translated text alone.`;
+/* eslint-enable @stylistic/max-len */
 
-// Resolves to the translated text, or null when there is nothing to translate into or the request fails.
-export async function translateLatestMessage(conversation, { apiKey, modelSetting }) {
+// Resolves to the translated text, or null when there is nothing to translate
+// into or the request fails.
+export async function translateLatestMessage(
+  conversation,
+  { apiKey, modelSetting }
+) {
   try {
     const response = await fetch(OPENROUTER_URL, {
       method: "POST",
@@ -40,7 +46,8 @@ export async function translateLatestMessage(conversation, { apiKey, modelSettin
       return null;
     }
 
-    const answer = (await response.json()).choices?.[0]?.message?.content?.trim();
+    const { choices } = await response.json();
+    const answer = choices?.[0]?.message?.content?.trim();
 
     return !answer || answer === NO_TRANSLATION ? null : answer;
   } catch (error) {
@@ -49,7 +56,8 @@ export async function translateLatestMessage(conversation, { apiKey, modelSettin
   }
 }
 
-// OpenRouter model ids may already carry ":" variants (e.g. ":free"), so only a known effort suffix is split off.
+// OpenRouter model ids may already carry ":" variants (e.g. ":free"), so only
+// a known effort suffix is split off.
 export function parseModelSetting(setting) {
   const separator = setting.lastIndexOf(":");
   const effort = setting.slice(separator + 1);

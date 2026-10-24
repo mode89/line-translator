@@ -23,7 +23,8 @@ describe("isSignedByLine", () => {
   });
 
   it("rejects a signature made with another secret", async () => {
-    assert.equal(await isSignedByLine(BODY, sign(BODY, "other"), SECRET), false);
+    const signature = sign(BODY, "other");
+    assert.equal(await isSignedByLine(BODY, signature, SECRET), false);
   });
 
   it("rejects a signature of a different body", async () => {
@@ -51,16 +52,23 @@ describe("event filters", () => {
     assert.equal(isTextMessageWithReplyToken(textMessage), true);
   });
 
-  it("rejects non-text messages, other events and messages without a reply token", () => {
-    assert.equal(isTextMessageWithReplyToken({ ...textMessage, message: { type: "sticker" } }), false);
-    assert.equal(isTextMessageWithReplyToken({ ...textMessage, type: "follow" }), false);
-    assert.equal(isTextMessageWithReplyToken({ ...textMessage, replyToken: undefined }), false);
+  it("rejects non-text messages, other events and missing reply tokens", () => {
+    for (const change of [
+      { message: { type: "sticker" } },
+      { type: "follow" },
+      { replyToken: undefined }
+    ]) {
+      const event = { ...textMessage, ...change };
+      assert.equal(isTextMessageWithReplyToken(event), false);
+    }
   });
 
   it("tells group messages from 1:1 chats and rooms", () => {
     assert.equal(isFromGroup(textMessage), true);
-    assert.equal(isFromGroup({ source: { type: "user", userId: "U1" } }), false);
-    assert.equal(isFromGroup({ source: { type: "room", roomId: "R1" } }), false);
+    const chat = { source: { type: "user", userId: "U1" } };
+    const room = { source: { type: "room", roomId: "R1" } };
+    assert.equal(isFromGroup(chat), false);
+    assert.equal(isFromGroup(room), false);
   });
 
   it("allows every group when no group is configured", () => {
@@ -83,10 +91,11 @@ describe("fetchGroupMemberName", () => {
     assert.equal(calls[0].init.headers.Authorization, "Bearer token");
   });
 
-  it("returns Unknown without calling LINE when there is no user id", async t => {
+  it("returns Unknown without asking LINE if there is no user id", async t => {
     const calls = stubFetch(t, () => assert.fail("LINE should not be called"));
 
-    assert.equal(await fetchGroupMemberName("token", "G1", undefined), "Unknown");
+    const name = await fetchGroupMemberName("token", "G1", undefined);
+    assert.equal(name, "Unknown");
     assert.equal(calls.length, 0);
   });
 
