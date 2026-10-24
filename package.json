@@ -1,4 +1,8 @@
 {
+  "type": "module",
+  "scripts": {
+    "test": "node --import ./test/support/register-hooks.js --test"
+  },
   "devDependencies": {
     "wrangler": "^4.152.0"
   }
